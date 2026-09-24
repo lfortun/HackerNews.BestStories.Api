@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="HackerNews.BestStories.Api/HackerNews.BestStories.Api.csproj" />
+  <Project Path="HackerNews.BestStories.Application/HackerNews.BestStories.Application.csproj" />
+  <Project Path="HackerNews.BestStories.Domain/HackerNews.BestStories.Domain.csproj" />
+  <Project Path="HackerNews.BestStories.Infrastructure/HackerNews.BestStories.Infrastructure.csproj" />
+  <Project Path="HackerNews.BestStories.UnitTests/HackerNews.BestStories.UnitTests.csproj" />
+</Solution>
