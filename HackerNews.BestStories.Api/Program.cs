@@ -1,41 +1,40 @@
+using HackerNews.BestStories.Api.Middlewares;
+using HackerNews.BestStories.Application;
+using HackerNews.BestStories.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// Register controller support required for API endpoints mapping
+builder.Services.AddControllers();
+
 builder.Services.AddOpenApi();
+
+// Register Clean Architecture layers dependency injection extensions
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplication();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Global Exception Middleware positioned at the start of the pipeline to catch all downstream errors
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Enable Swagger UI and OpenAPI documentation endpoints in development mode
 if (app.Environment.IsDevelopment())
 {
+    // Generates the openapi.json metadata file
     app.MapOpenApi();
+
+    // Enables the interactive web UI accessible via browser at: http://localhost:YOUR_PORT/swagger
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "Hacker News Best Stories API v1");
+        options.RoutePrefix = "swagger"; // Standard professional route endpoint
+    });
 }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+// Map and route API Controller endpoints dynamically
+app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
