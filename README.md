@@ -71,7 +71,8 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
   (15 minutes time to live).
 - **Bounded concurrency**: detail requests run in parallel with a maximum of 10
   concurrent requests (`SemaphoreSlim`), avoiding socket saturation and API overload.
-- **Retries**: Polly with exponential backoff (2s, 4s, 8s) on transient errors (5xx, 408).
+- **Retries**: Polly with exponential backoff (2s, 4s, 8s) on transient errors (5xx, 408),
+  each attempt bounded by its own timeout (seconds from `HackerNewsApi:Timeout`).
 
 ## Design patterns and SOLID principles
 

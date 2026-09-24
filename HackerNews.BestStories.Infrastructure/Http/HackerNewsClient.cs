@@ -48,7 +48,7 @@ namespace HackerNews.BestStories.Infrastructure.Http
                     $"item/{storyId}.json",
                     cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Error while fetching details for story ID {StoryId}.", storyId);
 

@@ -56,6 +56,15 @@ public class HackerNewsClientTests
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task GetStoryDetailsAsync_CanceledInsideRequest_ThrowsOperationCanceledException()
+    {
+        var sut = CreateSut(_ => throw new TaskCanceledException("Request canceled during I/O"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            sut.GetStoryDetailsAsync(21233041, CancellationToken.None));
+    }
+
     private static HttpResponseMessage JsonResponse(string json) =>
         new(HttpStatusCode.OK)
         {

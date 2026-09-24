@@ -31,9 +31,16 @@ namespace HackerNews.BestStories.Infrastructure
 
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
-                client.Timeout = TimeSpan.FromSeconds(options.Timeout);
             })
-            .AddPolicyHandler(GetRetryPolicy());
+            .AddPolicyHandler((serviceProvider, _) =>
+            {
+                // Per-attempt timeout: each retry attempt gets its own budget, so the 2s/4s/8s backoff
+                // sequence is not truncated by a single global HttpClient timeout.
+                var timeout = serviceProvider.GetRequiredService<IOptions<HackerNewsOptions>>().Value.Timeout;
+                return Policy.WrapAsync(
+                    GetRetryPolicy(),
+                    Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(timeout)));
+            });
 
             // 4. Register the Interface pointing to the DECORATOR
             // The decorator receives the concrete class injected through the HttpClientFactory above.
