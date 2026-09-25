@@ -15,7 +15,7 @@ fast under load, and never punches the upstream harder than it needs to.
 You only need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/lfortun/HackerNews.BestStories.Api.git
 cd HackerNews.BestStories.Api
 dotnet run --project HackerNews.BestStories.Api
 ```
