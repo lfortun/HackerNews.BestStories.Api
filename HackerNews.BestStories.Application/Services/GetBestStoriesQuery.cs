@@ -49,7 +49,6 @@ namespace HackerNews.BestStories.Application.Services
             // Executing them in parallel but respecting the concurrency limit
             var itemsResult = await Task.WhenAll(tasks);
 
-            //TODO: La "degradación graciosa" (en inglés, Graceful Degradation) es un principio de diseño de software que significa que, si una parte del sistema falla, la aplicación no se destruye por completo ni le muestra una pantalla de error genérica al usuario, sino que sigue funcionando con capacidades reducidas.
             // 3. Filter nulls and invalid items (graceful degradation: a missing/dead/deleted story must not fail the whole request), order by Score descending, and map to the final DTO
             var validItems = itemsResult
                 .Where(item => item != null && !string.IsNullOrWhiteSpace(item.Title) && !string.IsNullOrWhiteSpace(item.By));
