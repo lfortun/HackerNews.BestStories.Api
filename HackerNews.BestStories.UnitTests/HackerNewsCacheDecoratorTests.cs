@@ -59,4 +59,54 @@ public class HackerNewsCacheDecoratorTests
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetBestStoryIdsAsync_ConcurrentColdCacheCalls_InnerClientInvokedOnlyOnce()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _inner.Setup(c => c.GetBestStoryIdsAsync(It.IsAny<CancellationToken>()))
+            .Returns<CancellationToken>(async _ =>
+            {
+                await gate.Task;
+                return new[] { 1, 2, 3 };
+            });
+
+        var sut = CreateSut();
+
+        var first = sut.GetBestStoryIdsAsync();
+        var second = sut.GetBestStoryIdsAsync();
+
+        gate.SetResult();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.Equal(new[] { 1, 2, 3 }, results[0]);
+        Assert.Equal(new[] { 1, 2, 3 }, results[1]);
+        _inner.Verify(c => c.GetBestStoryIdsAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetBestStoryIdsAsync_OneWaiterCancels_SharedFetchCompletesForOtherWaiters()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _inner.Setup(c => c.GetBestStoryIdsAsync(It.IsAny<CancellationToken>()))
+            .Returns<CancellationToken>(async _ =>
+            {
+                await gate.Task;
+                return new[] { 1, 2, 3 };
+            });
+
+        var sut = CreateSut();
+
+        using var canceledCts = new CancellationTokenSource();
+        var canceledCaller = sut.GetBestStoryIdsAsync(canceledCts.Token);
+
+        canceledCts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledCaller);
+
+        gate.SetResult();
+        var otherCaller = await sut.GetBestStoryIdsAsync();
+
+        Assert.Equal(new[] { 1, 2, 3 }, otherCaller);
+        _inner.Verify(c => c.GetBestStoryIdsAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

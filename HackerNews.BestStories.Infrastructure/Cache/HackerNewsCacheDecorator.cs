@@ -8,6 +8,7 @@ namespace HackerNews.BestStories.Infrastructure.Cache
     /// <summary>
     /// Decorator that adds caching capabilities to the Hacker News client, allowing for improved performance and reduced load on the external API,
     /// following the Open/Closed principle of SOLID.
+    /// Single-flight: a shared Lazy<Task<T>> is stored in cache so concurrent cold-cache misses coalesce into a single upstream call.
     /// </summary>
     public class HackerNewsCacheDecorator : IHackerNewsClient
     {
@@ -19,7 +20,7 @@ namespace HackerNews.BestStories.Infrastructure.Cache
         private const string BestStoryIdsCacheKey = "HN_BestStoryIds";
         private const string StoryDetailCacheKeyPrefix = "HN_Story_";
 
-        // Times of expiration (TTL) for cache entries
+        // Times of expiration for cache entries
         private static readonly TimeSpan IdsCacheDuration = TimeSpan.FromMinutes(1); // The best story rankings change quickly
         private static readonly TimeSpan StoryCacheDuration = TimeSpan.FromMinutes(15); // An old story rarely changes its base data
 
@@ -35,24 +36,47 @@ namespace HackerNews.BestStories.Infrastructure.Cache
 
         public async Task<IEnumerable<int>> GetBestStoryIdsAsync(CancellationToken cancellationToken = default)
         {
-            return await _memoryCache.GetOrCreateAsync(BestStoryIdsCacheKey, async entry =>
+            var lazy = _memoryCache.GetOrCreate(BestStoryIdsCacheKey, entry =>
             {
                 _logger.LogInformation("Empty or expired cache for best story IDs. Calling external API.");
                 entry.AbsoluteExpirationRelativeToNow = IdsCacheDuration;
-                return await _innerClient.GetBestStoryIdsAsync(cancellationToken);
-            }) ?? Enumerable.Empty<int>();
+                // Shared fetch: it does not react to the caller's token, so a single disconnect does not
+                // abort the work for other waiters; Polly's per-attempt timeout still bounds it.
+                return new Lazy<Task<IEnumerable<int>>>(() => _innerClient.GetBestStoryIdsAsync(CancellationToken.None));
+            });
+
+            try
+            {
+                return await lazy!.Value.WaitAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A failed fetch must not be cached: the next request creates a new Lazy and retries.
+                _memoryCache.Remove(BestStoryIdsCacheKey);
+                throw;
+            }
         }
 
         public async Task<HackerNewsItem?> GetStoryDetailsAsync(int storyId, CancellationToken cancellationToken = default)
         {
             string cacheKey = $"{StoryDetailCacheKeyPrefix}{storyId}";
 
-            return await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            var lazy = _memoryCache.GetOrCreate(cacheKey, entry =>
             {
                 _logger.LogDebug("Empty or expired cache for story ID: {StoryId}. Calling external API.", storyId);
                 entry.AbsoluteExpirationRelativeToNow = StoryCacheDuration;
-                return await _innerClient.GetStoryDetailsAsync(storyId, cancellationToken);
+                return new Lazy<Task<HackerNewsItem?>>(() => _innerClient.GetStoryDetailsAsync(storyId, CancellationToken.None));
             });
+
+            try
+            {
+                return await lazy!.Value.WaitAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _memoryCache.Remove(cacheKey);
+                throw;
+            }
         }
     }
 }

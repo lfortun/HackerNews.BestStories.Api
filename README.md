@@ -56,7 +56,7 @@ Clean Architecture across 3 projects (`HackerNews.BestStories.slnx`):
 
 ```
 Api -> Infrastructure -> Application
-  \---- (transitive references; Api only references Infrastructure directly)
+  \---- (Api references Infrastructure and Application explicitly; no cycles)
 ```
 
 - **Api**: controllers, middleware, DI composition.
@@ -68,7 +68,10 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 ### Efficiency and protecting the Hacker News API
 
 - **In-memory cache**: best-story IDs (1 minute time to live) and per-story details
-  (15 minutes time to live).
+  (15 minutes time to live), with **single-flight**: a shared `Lazy<Task<T>>` is cached so
+  concurrent cold-cache misses coalesce into a single upstream call; failed fetches are
+  evicted so the next request retries, and one caller disconnecting does not abort the
+  shared fetch for the others.
 - **Bounded concurrency**: detail requests run in parallel with a maximum of 10
   concurrent requests (`SemaphoreSlim`), avoiding socket saturation and API overload.
 - **Retries**: Polly with exponential backoff (2s, 4s, 8s) on transient errors (5xx, 408),
@@ -122,9 +125,6 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 
 ## Planned improvements (given the time)
 
-- **Single-flight / cache stampede protection**: `IMemoryCache.GetOrCreateAsync` does not
-  prevent concurrent calls from hitting the external API on a cold cache; wrap with
-  `Lazy<T>` or a `SemaphoreSlim`.
 - **URI fallback**: for stories without a `url` (Ask/Show HN), fall back to
   `https://news.ycombinator.com/item?id={id}` instead of `null`.
 - **Do not expose `ex.Message`** in the 500 error response (avoids leaking internals).
@@ -155,8 +155,13 @@ xUnit + Moq, covering the happy path and the main error case of each unit:
   (including unix epoch → UTC `DateTimeOffset`); null stories are filtered without
   throwing (graceful degradation).
 - **`HackerNewsCacheDecoratorTests`**: IDs and story details are served from cache
-  (inner client invoked once); a `null` result propagates without throwing.
+  (inner client invoked once); single-flight coalesces concurrent cold-cache misses and
+  one waiter disconnecting does not abort the shared fetch; a `null` result propagates
+  without throwing.
 - **`HackerNewsClientTests`**: `beststories.json` deserialization and story detail
-  mapping; a server error on story details returns `null` instead of throwing.
+  mapping; a server error on story details returns `null` instead of throwing;
+  cancellation propagates.
+- **`StoryResponseTests`**: serialization produces the exact wire contract
+  (`title`, `uri`, `postedBy`, `time`, `score`, `commentCount`).
 - **`StoriesControllerTests`**: valid `n` returns the stories; `n <= 0` returns
   `400 Bad Request` without executing the query.

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\HackerNews.BestStories.Application\HackerNews.BestStories.Application.csproj" />
     <ProjectReference Include="..\HackerNews.BestStories.Infrastructure\HackerNews.BestStories.Infrastructure.csproj" />
   </ItemGroup>
 
