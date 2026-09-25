@@ -4,7 +4,7 @@ namespace HackerNews.BestStories.Application.DTOs
 {
     /// <summary>
     /// Represent the structure of an "Item" as returned by the official Hacker News API.
-    /// Use atributes from System.Text.Json to map the exact names from the external API without contaminating C# naming conventions (PascalCase). 
+    /// Use atributes from System.Text.Json to map the exact names from the external API without contaminating C# naming conventions (PascalCase).
     /// Also, we map descendants which is where Hacker News stores the comment count.
     /// </summary>
     public record HackerNewsItem(

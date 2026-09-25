@@ -32,12 +32,44 @@ Returns an array with the **5** best stories, for example:
 ```json
 [
   {
-    "title": "A uBlock Origin update was rejected from the Chrome Web Store",
-    "uri": "https://github.com/uBlockOrigin/uBlock-issues/issues/745",
-    "postedBy": "ismaildonmez",
-    "time": "2019-10-12T13:43:01+00:00",
-    "score": 1716,
-    "commentCount": 572
+    "title": "F-Droid 2.0",
+    "uri": "https://f-droid.org/2026/09/24/f-droid-2.0-a-new-chapter-for-android-freedom.html",
+    "postedBy": "daveoc64",
+    "time": "2026-09-24T15:26:12+00:00",
+    "score": 896,
+    "commentCount": 256
+  },
+  {
+    "title": "Italian parliament votes for return to nuclear energy",
+    "uri": "https://apnews.com/article/italy-nuclear-chernobyl-4891b6b7c7791ae84db6b0bf0f7cf567",
+    "postedBy": "geox",
+    "time": "2026-09-23T17:06:16+00:00",
+    "score": 873,
+    "commentCount": 758
+  },
+  {
+    "title": "Claude discovers a novel enzyme system with CRISPR-like repeats",
+    "uri": "https://www.anthropic.com/news/claude-discovers-novel-enzyme-system",
+    "postedBy": "raahelb",
+    "time": "2026-09-23T18:06:47+00:00",
+    "score": 757,
+    "commentCount": 781
+  },
+  {
+    "title": "Jev in 25 Lines of Python",
+    "uri": "https://www.nobodywho.ai/posts/jev-in-25-lines/",
+    "postedBy": "bashbjorn",
+    "time": "2026-09-23T07:26:23+00:00",
+    "score": 672,
+    "commentCount": 209
+  },
+  {
+    "title": "Meta takes down a critical video about meta AI Glasses after filming at Meta",
+    "uri": "https://www.reddit.com/r/facebook/comments/1wotwrk/meta_takes_down_a_critical_video_about_meta_ai/",
+    "postedBy": "pieterr",
+    "time": "2026-09-24T08:23:03+00:00",
+    "score": 596,
+    "commentCount": 357
   }
 ]
 ```
@@ -68,11 +100,12 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 
 ### Efficiency and protecting the Hacker News API
 
-- **In-memory cache**: best-story IDs (1 minute time to live) and per-story details
-  (15 minutes time to live), with **single-flight**: a shared `Lazy<Task<T>>` is cached so
-  concurrent cold-cache misses coalesce into a single upstream call; failed fetches are
-  evicted so the next request retries, and one caller disconnecting does not abort the
-  shared fetch for the others.
+- **In-memory cache**: best-story IDs and per-story details in memory (time to live
+  configurable via `HackerNewsApi:BestStoryIdsCacheSeconds` = 60s and
+  `HackerNewsApi:StoryDetailsCacheSeconds` = 900s by default), with **single-flight**: a
+  shared `Lazy<Task<T>>` is cached so concurrent cold-cache misses coalesce into a single
+  upstream call; failed fetches are evicted so the next request retries, and one caller
+  disconnecting does not abort the shared fetch for the others.
 - **Bounded concurrency**: detail requests run in parallel with a maximum of 10
   concurrent requests (`SemaphoreSlim`), avoiding socket saturation and API overload.
 - **Retries**: Polly with exponential backoff (2s, 4s, 8s) on transient errors (5xx, 408),
@@ -117,9 +150,9 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 
 ## Assumptions
 
-- Stories that resolve to `null` during fetch, or that are missing a `title`/`by`
-  (dead/deleted posts), are **filtered out** (graceful degradation) instead of failing the
-  whole request; a story without a `url` (Ask/Show HN) falls back to
+- Stories that resolve to `null` during fetch, or that are missing a `title`/`by` (which is
+  how dead/deleted posts typically come back), are **filtered out** (graceful degradation)
+  instead of failing the whole request; a story without a `url` (Ask/Show HN) falls back to
   `https://news.ycombinator.com/item?id={id}` so `uri` is always populated.
 - The final ordering is computed by `score` descending over the stories that survived the
   filter; if fewer than `n` valid stories exist, the available ones are returned.
@@ -140,7 +173,9 @@ Section `HackerNewsApi` in `appsettings.json`:
 {
   "HackerNewsApi": {
     "BaseUrl": "https://hacker-news.firebaseio.com/v0/",
-    "Timeout": 15
+    "Timeout": 15,
+    "BestStoryIdsCacheSeconds": 60,
+    "StoryDetailsCacheSeconds": 900
   }
 }
 ```

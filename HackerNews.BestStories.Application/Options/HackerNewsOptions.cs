@@ -10,5 +10,9 @@
         public string BaseUrl { get; set; } = string.Empty;
 
         public int Timeout { get; set; } = 5; // Default timeout in seconds
+
+        public int BestStoryIdsCacheSeconds { get; set; } = 60; // Best story rankings change quickly
+
+        public int StoryDetailsCacheSeconds { get; set; } = 900; // An old story rarely changes its base data
     }
 }

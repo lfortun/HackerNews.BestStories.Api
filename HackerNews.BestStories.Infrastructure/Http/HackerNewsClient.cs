@@ -53,7 +53,7 @@ namespace HackerNews.BestStories.Infrastructure.Http
                 _logger.LogError(ex, "Error while fetching details for story ID {StoryId}.", storyId);
 
                 // Return null to handle it gracefully in the upper layer without breaking the parallel flow
-                return null; 
+                return null;
             }
         }
     }

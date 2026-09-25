@@ -48,7 +48,8 @@ namespace HackerNews.BestStories.Infrastructure
                 new HackerNewsCacheDecorator(
                     provider.GetRequiredService<HackerNewsClient>(), //Get the real HTTP instance correctly
                     provider.GetRequiredService<IMemoryCache>(),
-                    provider.GetRequiredService<ILogger<HackerNewsCacheDecorator>>()
+                    provider.GetRequiredService<ILogger<HackerNewsCacheDecorator>>(),
+                    provider.GetRequiredService<IOptions<HackerNewsOptions>>()
                 ));
 
             return services;

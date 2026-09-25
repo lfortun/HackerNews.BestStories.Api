@@ -1,8 +1,10 @@
 using HackerNews.BestStories.Application.DTOs;
 using HackerNews.BestStories.Application.Interfaces;
+using HackerNews.BestStories.Application.Options;
 using HackerNews.BestStories.Infrastructure.Cache;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace HackerNews.BestStories.UnitTests;
@@ -13,7 +15,7 @@ public class HackerNewsCacheDecoratorTests
     private readonly MemoryCache _memoryCache = new(new MemoryCacheOptions());
 
     private HackerNewsCacheDecorator CreateSut() =>
-        new(_inner.Object, _memoryCache, NullLogger<HackerNewsCacheDecorator>.Instance);
+        new(_inner.Object, _memoryCache, NullLogger<HackerNewsCacheDecorator>.Instance, Options.Create(new HackerNewsOptions()));
 
     [Fact]
     public async Task GetBestStoryIdsAsync_CalledTwice_InnerClientInvokedOnlyOnce()

@@ -22,8 +22,8 @@ namespace HackerNews.BestStories.Api.Controllers
 
         /// <summary>
         /// Retrieves the details of the best 'n' stories from Hacker News API, ordered by score descending.
-        /// Route Filters ({n:int}): By using route constraints in the [HttpGet("best/{n:int}")] attribute, 
-        /// we prevent requests with non-numeric values (like api/stories/best/abc) from hitting the application code; 
+        /// Route Filters ({n:int}): By using route constraints in the [HttpGet("best/{n:int}")] attribute,
+        /// we prevent requests with non-numeric values (like api/stories/best/abc) from hitting the application code;
         /// the framework automatically discards them.
         /// </summary>
         /// <param name="n">The number of best stories to retrieve. Must be greater than 0.</param>
