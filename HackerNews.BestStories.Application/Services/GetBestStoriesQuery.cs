@@ -1,16 +1,19 @@
 ﻿using HackerNews.BestStories.Application.DTOs;
 using HackerNews.BestStories.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace HackerNews.BestStories.Application.Services
 {
     public class GetBestStoriesQuery : IGetBestStoriesQuery
     {
         private readonly IHackerNewsClient _newsClient;
+        private readonly ILogger<GetBestStoriesQuery> _logger;
         private const int MaxConcurrentRequests = 10; // Limit to avoid saturating network sockets
 
-        public GetBestStoriesQuery(IHackerNewsClient newsClient)
+        public GetBestStoriesQuery(IHackerNewsClient newsClient, ILogger<GetBestStoriesQuery> logger)
         {
             _newsClient = newsClient ?? throw new ArgumentNullException(nameof(newsClient));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<IEnumerable<StoryResponse>> ExecuteAsync(int count, CancellationToken cancellationToken = default)
@@ -47,9 +50,17 @@ namespace HackerNews.BestStories.Application.Services
             var itemsResult = await Task.WhenAll(tasks);
 
             //TODO: La "degradación graciosa" (en inglés, Graceful Degradation) es un principio de diseño de software que significa que, si una parte del sistema falla, la aplicación no se destruye por completo ni le muestra una pantalla de error genérica al usuario, sino que sigue funcionando con capacidades reducidas.
-            // 3. Filter nulls (graceful degradation), order by Score descending, and map to the final DTO
-            return itemsResult
-                .Where(item => item != null)
+            // 3. Filter nulls and invalid items (graceful degradation: a missing/dead/deleted story must not fail the whole request), order by Score descending, and map to the final DTO
+            var validItems = itemsResult
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.Title) && !string.IsNullOrWhiteSpace(item.By));
+
+            var filteredCount = itemsResult.Length - validItems.Count();
+            if (filteredCount > 0)
+            {
+                _logger.LogWarning("Graceful degradation: {RequestedCount} story details were requested, {FilteredCount} of them were discarded (missing, deleted or invalid).", targetIds.Count, filteredCount);
+            }
+
+            return validItems
                 .Select(item => MapToResponse(item!))
                 .OrderByDescending(story => story.Score);
         }
@@ -57,14 +68,17 @@ namespace HackerNews.BestStories.Application.Services
         /// <summary>
         /// Map the external entity to our output contract in a clean way.
         /// Translates the Unix epoch (seconds) to a DateTimeOffset in ISO 8601 UTC format.
+        /// Stories without a url (Ask/Show HN) fall back to the public Hacker News item page.
         /// </summary>
         private static StoryResponse MapToResponse(HackerNewsItem item)
         {
+            var storyUri = string.IsNullOrWhiteSpace(item.Url) ? $"https://news.ycombinator.com/item?id={item.Id}" : item.Url;
+
             return new StoryResponse(
                 Title: item.Title,
-                Uri: item.Url,
+                Uri: storyUri,
                 PostedBy: item.By,
-                Time: DateTimeOffset.FromUnixTimeSeconds(item.Time).ToUniversalTime(),
+                Time: DateTimeOffset.FromUnixTimeSeconds(item.Time),
                 Score: item.Score,
                 CommentCount: item.Descendants
             );

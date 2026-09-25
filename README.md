@@ -46,9 +46,10 @@ Returns an array with the **5** best stories, for example:
 |---|---|
 | `{n}` | Number of stories to return. Positive integer (route `api/stories/best/{n:int}`). |
 
-- `n <= 0` → `400 Bad Request`.
+- `n <= 0` → `400 Bad Request` (`application/problem+json`, RFC 7807).
 - Non-numeric `n` → never reaches the controller (`{n:int}` route constraint).
-- Unhandled errors → `500 Internal Server Error` (global exception middleware).
+- Unhandled errors → `500 Internal Server Error` (`application/problem+json`); the exception
+  `detail` is only included in Development (avoids leaking internals in production).
 
 ## Architecture
 
@@ -76,6 +77,8 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
   concurrent requests (`SemaphoreSlim`), avoiding socket saturation and API overload.
 - **Retries**: Polly with exponential backoff (2s, 4s, 8s) on transient errors (5xx, 408),
   each attempt bounded by its own timeout (seconds from `HackerNewsApi:Timeout`).
+- **Observability**: `GetBestStoriesQuery` logs a warning with the requested/discarded
+  counts whenever the graceful-degradation filter drops stories.
 
 ## Design patterns and SOLID principles
 
@@ -114,8 +117,10 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 
 ## Assumptions
 
-- Stories that resolve to `null` during fetch (missing `title`, `by` or `url`) are
-  **filtered out** (graceful degradation) instead of failing the whole request.
+- Stories that resolve to `null` during fetch, or that are missing a `title`/`by`
+  (dead/deleted posts), are **filtered out** (graceful degradation) instead of failing the
+  whole request; a story without a `url` (Ask/Show HN) falls back to
+  `https://news.ycombinator.com/item?id={id}` so `uri` is always populated.
 - The final ordering is computed by `score` descending over the stories that survived the
   filter; if fewer than `n` valid stories exist, the available ones are returned.
 - The cache is in-memory per instance (fine for a single-instance deployment; use
@@ -125,9 +130,6 @@ Flow: `StoriesController` → `GetBestStoriesQuery` → `IHackerNewsClient` (cac
 
 ## Planned improvements (given the time)
 
-- **URI fallback**: for stories without a `url` (Ask/Show HN), fall back to
-  `https://news.ycombinator.com/item?id={id}` instead of `null`.
-- **Do not expose `ex.Message`** in the 500 error response (avoids leaking internals).
 - **Packaging**: Dockerfile so it runs without a local SDK.
 
 ## Configuration
@@ -152,8 +154,8 @@ dotnet test
 xUnit + Moq, covering the happy path and the main error case of each unit:
 
 - **`GetBestStoriesQueryTests`**: ordering by score descending and full field mapping
-  (including unix epoch → UTC `DateTimeOffset`); null stories are filtered without
-  throwing (graceful degradation).
+  (including unix epoch → UTC `DateTimeOffset`); null/missing-`title`/missing-`by` stories
+  are filtered without throwing, and a missing `url` falls back to the item page.
 - **`HackerNewsCacheDecoratorTests`**: IDs and story details are served from cache
   (inner client invoked once); single-flight coalesces concurrent cold-cache misses and
   one waiter disconnecting does not abort the shared fetch; a `null` result propagates
@@ -164,4 +166,4 @@ xUnit + Moq, covering the happy path and the main error case of each unit:
 - **`StoryResponseTests`**: serialization produces the exact wire contract
   (`title`, `uri`, `postedBy`, `time`, `score`, `commentCount`).
 - **`StoriesControllerTests`**: valid `n` returns the stories; `n <= 0` returns
-  `400 Bad Request` without executing the query.
+  `400` with a `ProblemDetails` body without executing the query.

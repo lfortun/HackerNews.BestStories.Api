@@ -1,6 +1,7 @@
 using HackerNews.BestStories.Api.Controllers;
 using HackerNews.BestStories.Application.DTOs;
 using HackerNews.BestStories.Application.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -31,12 +32,14 @@ public class StoriesControllerTests
     }
 
     [Fact]
-    public async Task GetBestStories_NonPositiveCount_ReturnsBadRequest_AndDoesNotExecuteQuery()
+    public async Task GetBestStories_NonPositiveCount_ReturnsProblemDetails400_AndDoesNotExecuteQuery()
     {
         var result = await _controller.GetBestStories(0, CancellationToken.None);
 
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.NotNull(badRequest.Value);
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
         _query.Verify(q => q.ExecuteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

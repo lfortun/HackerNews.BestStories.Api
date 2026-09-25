@@ -38,7 +38,10 @@ namespace HackerNews.BestStories.Api.Controllers
             if (n <= 0)
             {
                 _logger.LogWarning("Validation failed. Requested story count 'n' must be greater than zero. Provided value: {Count}", n);
-                return BadRequest(new { Message = "The parameter 'n' must be a positive integer greater than zero." });
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "The parameter 'n' must be a positive integer greater than zero.");
             }
 
             _logger.LogInformation("Processing request to fetch the best {Count} stories.", n);
