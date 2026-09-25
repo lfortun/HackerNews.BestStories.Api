@@ -14,6 +14,6 @@ namespace HackerNews.BestStories.Application.DTOs
         [property: JsonPropertyName("by")] string By,
         [property: JsonPropertyName("time")] long Time, // Unix epoch time
         [property: JsonPropertyName("score")] int Score,
-        [property: JsonPropertyName("descendants")] int Descendants // Equivale al commentCount
+        [property: JsonPropertyName("descendants")] int Descendants // Equivalent to commentCount
     );
 }

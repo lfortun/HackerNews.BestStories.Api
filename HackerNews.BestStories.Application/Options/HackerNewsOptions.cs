@@ -1,6 +1,6 @@
 ﻿namespace HackerNews.BestStories.Application.Options
 {
-    // <summary>
+    /// <summary>
     /// Map the "HackerNewsApi" section of the appsettings.json to a strongly typed class.
     /// </summary>
     public class HackerNewsOptions
